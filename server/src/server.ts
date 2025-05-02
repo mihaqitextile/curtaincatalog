@@ -8,6 +8,7 @@ import { dirname, join } from "path";
 import authRoutes from "./routes/authRoutes";
 import productRoutes from "./routes/productRoutes";
 import categoryRoutes from "./routes/categoryRoutes";
+import userRoutes from "./routes/user";
 import fs from "fs";
 import iconv from "iconv-lite";
 
@@ -17,42 +18,22 @@ const __dirname = dirname(__filename);
 // 加载 .env 文件
 const envPath = join(__dirname, "..", ".env");
 
-// 如果文件存在，先删除
-if (fs.existsSync(envPath)) {
-  fs.unlinkSync(envPath);
-  console.log("🗑️ 已删除旧的 .env 文件");
+// 检查 .env 文件是否存在
+if (!fs.existsSync(envPath)) {
+  console.error("❌ .env 文件不存在，请确保已创建 .env 文件");
+  process.exit(1);
 }
-
-// 创建新的 .env 文件
-const envContent = `# 数据库配置
-DATABASE_URL="postgresql://user:password@localhost:5438/curtainscatalog?schema=public"
-
-# JWT 配置
-JWT_SECRET="x9U@zB2#r5kP$wL8qT1e!Vm7Nc6YfJ3R"
-NEXT_PUBLIC_JWT_SECRET="your-super-secret-key-here"
-
-# 服务器配置
-PORT=3001
-NODE_ENV=development
-`;
-
-// 使用 iconv-lite 处理编码
-const buffer = iconv.encode(envContent, "utf8");
-fs.writeFileSync(envPath, buffer);
-console.log("✅ .env 文件已创建");
 
 // 读取并解析 .env 文件
 const fileBuffer = fs.readFileSync(envPath);
-const newEnvContent = iconv.decode(fileBuffer, "utf8");
-console.log("📄 .env 文件内容:", newEnvContent);
+const envContent = iconv.decode(fileBuffer, "utf8");
+console.log("📄 已加载 .env 文件");
 
-const envConfig = dotenv.parse(newEnvContent);
-console.log("🔍 解析后的环境变量:", envConfig);
+const envConfig = dotenv.parse(envContent);
 
 // 手动设置环境变量
 Object.entries(envConfig).forEach(([key, value]) => {
   process.env[key] = value;
-  console.log(`设置环境变量 ${key}=${value}`);
 });
 
 console.log("✅ .env 文件加载成功");
@@ -117,6 +98,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/user", userRoutes);
 
 // 添加一个通配符路由来捕获所有未匹配的路由
 app.use("*", (req, res) => {

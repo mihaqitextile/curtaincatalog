@@ -76,6 +76,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     console.log("Request body:", req.body);
     console.log("JWT Secret:", process.env.JWT_SECRET ? "Exists" : "Missing");
 
+    if (!email || !password) {
+      console.log("Missing email or password");
+      res.status(400).json({
+        success: false,
+        error: "Email and password are required",
+      });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { email },
     });
@@ -209,5 +218,41 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to logout" });
+  }
+};
+
+export const getCurrentUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const accessToken = req.cookies.accessToken;
+    if (!accessToken) {
+      res.status(401).json({ success: false, error: "Not authenticated" });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user?.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ success: false, error: "User not found" });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: "Failed to get user" });
   }
 };

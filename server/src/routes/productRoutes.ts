@@ -1,5 +1,6 @@
 import express from "express";
 import { authenticateJwt, isSuperAdmin } from "../middleware/authMiddleware";
+import { authenticateToken } from "../middleware/auth";
 import {
   productImageUpload,
   productVideoUpload,
@@ -96,10 +97,10 @@ router.get("/", async (req, res) => {
 router.get("/fetch-admin-products", authenticateJwt, isSuperAdmin, getProducts);
 
 // 根据ID获取产品
-router.get("/:id", authenticateJwt, getProductById);
+router.get("/:id", authenticateToken, getProductById);
 
 // 根据slug获取产品
-router.get("/slug/:slug", authenticateJwt, getProductBySlug);
+router.get("/slug/:slug", authenticateToken, getProductBySlug);
 
 // 检查产品代码是否存在
 router.get("/check-code/:code", async (req, res) => {
@@ -118,7 +119,7 @@ router.get("/check-code/:code", async (req, res) => {
 // 创建产品（需要超级管理员权限）
 router.post(
   "/create-new-product",
-  authenticateJwt,
+  authenticateToken,
   isSuperAdmin,
   variantImageUpload,
   handleUploadError,
@@ -128,7 +129,7 @@ router.post(
 // 更新产品（需要超级管理员权限）
 router.put(
   "/:id",
-  authenticateJwt,
+  authenticateToken,
   isSuperAdmin,
   variantImageUpload,
   handleUploadError,
@@ -136,6 +137,6 @@ router.put(
 );
 
 // 删除产品（需要超级管理员权限）
-router.delete("/:id", authenticateJwt, isSuperAdmin, deleteProduct);
+router.delete("/:id", authenticateToken, isSuperAdmin, deleteProduct);
 
 export default router;

@@ -4,7 +4,7 @@ import { TextEncoder } from "util";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    userId: string;
+    id: string;
     email: string;
     role: string;
   };
@@ -48,7 +48,7 @@ export const authenticateJwt = async (
     );
     console.log("Auth middleware - Token verified, payload:", payload);
     req.user = {
-      userId: payload.userId as string,
+      id: payload.userId as string,
       email: payload.email as string,
       role: payload.role as string,
     };

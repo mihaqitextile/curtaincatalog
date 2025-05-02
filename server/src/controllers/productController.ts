@@ -79,7 +79,9 @@ async function uploadImage(file: Express.Multer.File): Promise<UploadResult> {
 
       if (attempt === maxRetries) {
         throw new Error(
-          `Failed to upload image after ${maxRetries} attempts: ${error.message}`
+          `Failed to upload image after ${maxRetries} attempts: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
         );
       }
 
@@ -170,7 +172,7 @@ export const createProduct = async (
 
     if (missingFields.length > 0) {
       console.log("Missing required fields:", missingFields);
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: `Missing required fields: ${missingFields.join(", ")}`,
         details: {
@@ -178,6 +180,7 @@ export const createProduct = async (
           missingFields,
         },
       });
+      return;
     }
 
     // Parse and validate variants data
@@ -207,7 +210,7 @@ export const createProduct = async (
         parsedVariants = JSON.parse(variantsData);
       } catch (parseError: any) {
         console.error("JSON parse error:", parseError);
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: "Invalid JSON format in variants data",
           details: {
@@ -215,12 +218,13 @@ export const createProduct = async (
             receivedData: variantsData,
           },
         });
+        return;
       }
 
       console.log("Parsed variants:", parsedVariants);
 
       if (!Array.isArray(parsedVariants)) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: "Variants must be an array",
           details: {
@@ -228,6 +232,7 @@ export const createProduct = async (
             receivedValue: parsedVariants,
           },
         });
+        return;
       }
 
       // Validate each variant
@@ -235,29 +240,31 @@ export const createProduct = async (
         console.log("Validating variant:", variant);
 
         if (!variant.color) {
-          return res.status(400).json({
+          res.status(400).json({
             success: false,
             error: "Each variant must have a color",
             details: {
               invalidVariant: variant,
             },
           });
+          return;
         }
         if (!Array.isArray(variant.sizes)) {
-          return res.status(400).json({
+          res.status(400).json({
             success: false,
             error: "Each variant must have a sizes array",
             details: {
               invalidVariant: variant,
             },
           });
+          return;
         }
 
         // Validate sizePrices and sizeStocks
         if (variant.sizePrices) {
           console.log("Size prices for variant:", variant.sizePrices);
           if (typeof variant.sizePrices !== "object") {
-            return res.status(400).json({
+            res.status(400).json({
               success: false,
               error: "sizePrices must be an object",
               details: {
@@ -265,13 +272,14 @@ export const createProduct = async (
                 receivedType: typeof variant.sizePrices,
               },
             });
+            return;
           }
         }
 
         if (variant.sizeStocks) {
           console.log("Size stocks for variant:", variant.sizeStocks);
           if (typeof variant.sizeStocks !== "object") {
-            return res.status(400).json({
+            res.status(400).json({
               success: false,
               error: "sizeStocks must be an object",
               details: {
@@ -279,21 +287,27 @@ export const createProduct = async (
                 receivedType: typeof variant.sizeStocks,
               },
             });
+            return;
           }
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error processing variants:", error);
-      return res.status(400).json({
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      res.status(400).json({
         success: false,
         error: "Error processing variants data",
         details: {
-          errorMessage: error.message,
+          errorMessage,
           errorStack:
-            process.env.NODE_ENV === "development" ? error.stack : undefined,
+            process.env.NODE_ENV === "development" && error instanceof Error
+              ? error.stack
+              : undefined,
           receivedData: req.body.variants,
         },
       });
+      return;
     }
 
     // Process images
@@ -308,13 +322,14 @@ export const createProduct = async (
       uploadedFiles["images"].length === 0
     ) {
       console.log("No main images were uploaded");
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "At least one main image is required",
         details: {
           receivedFiles: uploadedFiles ? Object.keys(uploadedFiles) : [],
         },
       });
+      return;
     }
 
     // Process main images
@@ -465,36 +480,46 @@ export const createProduct = async (
       }
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       data: product,
       redirect: "/super-admin/products/list",
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating product:", error);
     // Log the request body and files for debugging
     console.error("Request body:", req.body);
     console.error("Request files:", req.files);
 
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorCode = error instanceof Error ? (error as any).code : undefined;
+
     // Check for specific validation errors
-    if (error.name === "PrismaClientValidationError") {
-      return res.status(400).json({
+    if (errorName === "PrismaClientValidationError") {
+      res.status(400).json({
         success: false,
-        error: "Invalid data format: " + error.message,
+        error: "Invalid data format: " + errorMessage,
       });
+      return;
     }
 
-    if (error.code === "P2002") {
-      return res.status(400).json({
+    if (errorCode === "P2002") {
+      res.status(400).json({
         success: false,
         error: "A product with this code already exists",
       });
+      return;
     }
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      error: error.message || "Failed to create product",
-      details: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      error: errorMessage || "Failed to create product",
+      details:
+        process.env.NODE_ENV === "development" && error instanceof Error
+          ? error.stack
+          : undefined,
     });
   }
 };
@@ -535,7 +560,7 @@ export const getProducts = async (req: Request, res: Response) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       products,
       pagination: {
@@ -547,11 +572,13 @@ export const getProducts = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error in getProducts:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       error: "Failed to fetch products",
       details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
+        process.env.NODE_ENV === "development" && error instanceof Error
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -840,10 +867,11 @@ export const getProductBySlug = async (
 
     if (!req.user) {
       console.error("No user found in request");
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: "Authentication required",
       });
+      return;
     }
 
     const product = await prisma.product.findUnique({
@@ -858,24 +886,27 @@ export const getProductBySlug = async (
 
     if (!product) {
       console.log("Product not found for slug:", slug);
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Product not found",
       });
+      return;
     }
 
     console.log("Product found:", product.id);
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       product,
     });
   } catch (error) {
     console.error("Error in getProductBySlug:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       error: "Failed to fetch product",
       details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
+        process.env.NODE_ENV === "development" && error instanceof Error
+          ? error.message
+          : undefined,
     });
   }
 };
